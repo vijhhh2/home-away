@@ -1,4 +1,4 @@
-"use server";
+ "use server";
 
 import {
   imageSchema,
@@ -11,6 +11,7 @@ import { currentUser, clerkClient } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { uploadImage } from "./supabase";
+ import exp from "node:constants";
 
 const getAuthUser = async () => {
   const user = await currentUser();
@@ -209,3 +210,46 @@ export const fetchProperties = async ({
 
   return properties;
 };
+
+export const fetchFavouriteId = async ({ propertyId }: {propertyId: string}) => {
+  const user = await getAuthUser();
+  const favourite = await db.favorite.findFirst({
+    where: {
+      propertyId,
+      profileId: user.id,
+    },
+    select: {
+      id: true,
+    }
+  });
+  return favourite?.id || null;
+};
+
+export const toggleFavouritesAction = async (prevState: {
+  propertyId: string;
+  favoriteId: string | null;
+  pathname: string;
+}) => {
+  const user = await getAuthUser();
+  const { propertyId, favoriteId, pathname } = prevState;
+  try {
+    if (favoriteId) {
+      await db.favorite.delete({
+        where: {
+          id: favoriteId,
+        }
+      })
+    } else {
+      await db.favorite.create({
+        data: {
+          propertyId,
+          profileId: user.id,
+        }
+      })
+    }
+    revalidatePath(pathname);
+    return  { message: favoriteId ? 'Removed from favorites' : 'Added to Favorites' };
+  } catch (e) {
+    return renderError(e);
+  }
+}
