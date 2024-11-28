@@ -1,17 +1,20 @@
-import { fetchPropertyDetails } from '@/utils/actions';
+import { fetchPropertyDetails, findExistingReview } from '@/utils/actions';
 import { redirect } from 'next/navigation';
+import { auth } from '@clerk/nextjs/server';
 import BreadCrumbs from '@/components/properties/BreadCrumbs';
 import FavoriteToggleButton from '@/components/card/FavoriteToggleButton';
 import ShareButton from '@/components/properties/ShareButton';
 import ImageContainer from '@/components/properties/ImageContainer';
 import PropertyRating from '@/components/card/PropertyRating';
-import BookingCalendar from '@/components/properties/BookingCalendar';
 import PropertyDetails from '@/components/properties/PropertyDetails';
 import UserInfo from '@/components/properties/UserInfo';
 import { Separator } from '@/components/ui/separator';
 import Description from '@/components/properties/Description';
 import Amenities from '@/components/properties/Amenities';
 import DynamicMap from '@/components/properties/DynamicMap';
+import SubmitReview from '@/components/reviews/SubmitReview';
+import PropertyReviews from '@/components/reviews/PropertyReviews';
+import DynamicBookingWrapper from '@/components/bookings/DynamicBookingWrapper';
 
 const PropertyDetailsPage = async ({ params }: { params: { id: string } }) => {
     const id = (await params).id;
@@ -23,6 +26,13 @@ const PropertyDetailsPage = async ({ params }: { params: { id: string } }) => {
     const details = { baths, beds, bedrooms, guests };
     const firstName = property.profile.firstName;
     const profileImage = property.profile.profileImage;
+
+    const { userId } = await auth();
+    const isNotOwner = property.profile.clerkId !== userId;
+    const reviewDoesNotExist =
+        userId &&
+        isNotOwner &&
+        !(await findExistingReview(userId, property.id));
 
     return (
         <section>
@@ -54,9 +64,16 @@ const PropertyDetailsPage = async ({ params }: { params: { id: string } }) => {
                     <DynamicMap countryCode={property.country} />
                 </div>
                 <div className="lg:col-span-4 flex flex-col items-center">
-                    <BookingCalendar />
+                    {/*<BookingCalendar />*/}
+                    <DynamicBookingWrapper
+                        propertyId={property.id}
+                        price={property.price}
+                        bookings={property.bookings}
+                    />
                 </div>
             </section>
+            {reviewDoesNotExist && <SubmitReview propertyId={property.id} />}
+            <PropertyReviews propertyId={property.id} />
         </section>
     );
 };

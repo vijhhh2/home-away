@@ -1,25 +1,25 @@
-"use server";
+'use server';
 
 import {
+    createReviewSchema,
     imageSchema,
     profileSchema,
     propertySchema,
     validatedWithZodSchema,
-} from "./schemas";
-import db from "./db";
-import {currentUser, clerkClient} from "@clerk/nextjs/server";
-import {redirect} from "next/navigation";
-import {revalidatePath} from "next/cache";
-import {uploadImage} from "./supabase";
-import exp from "node:constants";
+} from './schemas';
+import db from './db';
+import { clerkClient, currentUser } from '@clerk/nextjs/server';
+import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
+import { uploadImage } from './supabase';
 
 const getAuthUser = async () => {
     const user = await currentUser();
     if (!user) {
-        throw new Error("You must be logged in to access this route");
+        throw new Error('You must be logged in to access this route');
     }
     if (!user.privateMetadata.hasProfile) {
-        return redirect("/profile/create");
+        return redirect('/profile/create');
     }
     return user;
 };
@@ -31,7 +31,7 @@ const renderError = async (error: unknown) => {
         };
     } else {
         return {
-            message: "An error occurred",
+            message: 'An error occurred',
         };
     }
 };
@@ -43,7 +43,7 @@ export const createProfileAction = async (
     try {
         const user = await currentUser();
         if (!user) {
-            throw new Error("Please login to create a profile");
+            throw new Error('Please login to create a profile');
         }
 
         const rawData = Object.fromEntries(formData);
@@ -52,7 +52,7 @@ export const createProfileAction = async (
             data: {
                 clerkId: user.id,
                 email: user.emailAddresses[0].emailAddress,
-                profileImage: user.imageUrl ?? "",
+                profileImage: user.imageUrl ?? '',
                 ...validatedFields,
             },
         });
@@ -65,7 +65,7 @@ export const createProfileAction = async (
         return renderError(e);
     }
 
-    redirect("/");
+    redirect('/');
 };
 
 export const fetchProfileImage = async () => {
@@ -100,7 +100,7 @@ export const fetchProfile = async () => {
     });
 
     if (!profile) {
-        return redirect("/profile/create");
+        return redirect('/profile/create');
     }
 
     return profile;
@@ -119,10 +119,10 @@ export const updateProfileAction = async (
             where: {
                 clerkId: user.id,
             },
-            data: {...data},
+            data: { ...data },
         });
-        revalidatePath("/profile");
-        return {message: "Profile updated successfully"};
+        revalidatePath('/profile');
+        return { message: 'Profile updated successfully' };
     } catch (error) {
         return renderError(error);
     }
@@ -132,10 +132,10 @@ export const updateProfileImageAction = async (
     prevState: unknown,
     formData: FormData
 ): Promise<{ message: string }> => {
-    const image = formData.get("image") as File;
+    const image = formData.get('image') as File;
     const user = await getAuthUser();
     try {
-        const validatedFields = validatedWithZodSchema(imageSchema, {image});
+        const validatedFields = validatedWithZodSchema(imageSchema, { image });
         const fullPath = await uploadImage(validatedFields.image);
         await db.profile.update({
             where: {
@@ -145,8 +145,8 @@ export const updateProfileImageAction = async (
                 profileImage: fullPath,
             },
         });
-        revalidatePath("/profile");
-        return {message: "Profile image updated successfully"};
+        revalidatePath('/profile');
+        return { message: 'Profile image updated successfully' };
     } catch (error) {
         return renderError(error);
     }
@@ -159,7 +159,7 @@ export const createPropertyAction = async (
     const user = await getAuthUser();
     try {
         const rawData = Object.fromEntries(formData);
-        const file = formData.get("image") as File;
+        const file = formData.get('image') as File;
 
         const validatedFields = validatedWithZodSchema(propertySchema, rawData);
         const validateImageField = validatedWithZodSchema(imageSchema, {
@@ -177,13 +177,13 @@ export const createPropertyAction = async (
     } catch (error) {
         return renderError(error);
     }
-    redirect("/");
+    redirect('/');
 };
 
 export const fetchProperties = async ({
-                                          search = "",
-                                          category,
-                                      }: {
+    search = '',
+    category,
+}: {
     search?: string;
     category?: string;
 }) => {
@@ -191,8 +191,8 @@ export const fetchProperties = async ({
         where: {
             category,
             OR: [
-                {name: {contains: search, mode: "insensitive"}},
-                {tagline: {contains: search, mode: "insensitive"}},
+                { name: { contains: search, mode: 'insensitive' } },
+                { tagline: { contains: search, mode: 'insensitive' } },
             ],
         },
         select: {
@@ -204,14 +204,18 @@ export const fetchProperties = async ({
             image: true,
         },
         orderBy: {
-            createdAt: "desc",
+            createdAt: 'desc',
         },
     });
 
     return properties;
 };
 
-export const fetchFavouriteId = async ({propertyId}: { propertyId: string }) => {
+export const fetchFavouriteId = async ({
+    propertyId,
+}: {
+    propertyId: string;
+}) => {
     const user = await getAuthUser();
     const favourite = await db.favorite.findFirst({
         where: {
@@ -220,7 +224,7 @@ export const fetchFavouriteId = async ({propertyId}: { propertyId: string }) => 
         },
         select: {
             id: true,
-        }
+        },
     });
     return favourite?.id || null;
 };
@@ -231,28 +235,32 @@ export const toggleFavouritesAction = async (prevState: {
     pathname: string;
 }) => {
     const user = await getAuthUser();
-    const {propertyId, favoriteId, pathname} = prevState;
+    const { propertyId, favoriteId, pathname } = prevState;
     try {
         if (favoriteId) {
             await db.favorite.delete({
                 where: {
                     id: favoriteId,
-                }
-            })
+                },
+            });
         } else {
             await db.favorite.create({
                 data: {
                     propertyId,
                     profileId: user.id,
-                }
-            })
+                },
+            });
         }
         revalidatePath(pathname);
-        return {message: favoriteId ? 'Removed from favorites' : 'Added to Favorites'};
+        return {
+            message: favoriteId
+                ? 'Removed from favorites'
+                : 'Added to Favorites',
+        };
     } catch (e) {
         return renderError(e);
     }
-}
+};
 
 export const fetchFavorites = async () => {
     const user = await getAuthUser();
@@ -269,11 +277,11 @@ export const fetchFavorites = async () => {
                     country: true,
                     price: true,
                     image: true,
-                }
-            }
-        }
+                },
+            },
+        },
     });
-    return favourites.map(f => f.property);
+    return favourites.map((f) => f.property);
 };
 
 export const fetchPropertyDetails = async (id: string) => {
@@ -282,7 +290,127 @@ export const fetchPropertyDetails = async (id: string) => {
             id: id,
         },
         include: {
-            profile: true
-        }
-    })
-}
+            profile: true,
+            bookings: {
+                select: {
+                    checkIn: true,
+                    checkOut: true,
+                },
+            },
+        },
+    });
+};
+
+export const createReviewAction = async (
+    prevState: unknown,
+    formData: FormData
+) => {
+    const user = await getAuthUser();
+    try {
+        const rawData = Object.fromEntries(formData);
+        const validatedFields = validatedWithZodSchema(
+            createReviewSchema,
+            rawData
+        );
+        await db.review.create({
+            data: {
+                ...validatedFields,
+                profileId: user.id,
+            },
+        });
+        revalidatePath(`/properties/${validatedFields.propertyId}`);
+        return { message: 'Review submitted successfully.' };
+    } catch (e) {
+        return renderError(e);
+    }
+};
+
+export const fetchPropertyReviews = async (propertyId: string) => {
+    return db.review.findMany({
+        where: {
+            propertyId,
+        },
+        select: {
+            id: true,
+            rating: true,
+            comment: true,
+            profile: {
+                select: {
+                    firstName: true,
+                    profileImage: true,
+                },
+            },
+        },
+        orderBy: {
+            createdAt: 'desc',
+        },
+    });
+};
+
+export const fetchPropertyReviewsByUser = async () => {
+    const user = await getAuthUser();
+    return db.review.findMany({
+        where: {
+            profileId: user.id,
+        },
+        select: {
+            id: true,
+            rating: true,
+            comment: true,
+            property: {
+                select: {
+                    name: true,
+                    image: true,
+                },
+            },
+        },
+    });
+};
+
+export const deleteReviewAction = async (prev: { reviewId: string }) => {
+    const user = await getAuthUser();
+    try {
+        await db.review.delete({
+            where: {
+                id: prev.reviewId,
+                profileId: user.id,
+            },
+        });
+        revalidatePath('/reviews');
+        return { message: 'deleted  review successfully.' };
+    } catch (e) {
+        return renderError(e);
+    }
+};
+
+export const fetchPropertyRating = async (propertyId: string) => {
+    const result = await db.review.groupBy({
+        by: ['propertyId'],
+        _avg: {
+            rating: true,
+        },
+        _count: {
+            rating: true,
+        },
+        where: {
+            propertyId,
+        },
+    });
+
+    return {
+        rating: result[0]?._avg.rating?.toFixed(1) ?? 0,
+        count: result[0]?._count.rating ?? 0,
+    };
+};
+
+export const findExistingReview = async (
+    userId: string,
+    propertyId: string
+) => {
+    return db.review.findFirst({
+        where: {
+            profileId: userId,
+            propertyId,
+        },
+    });
+};
