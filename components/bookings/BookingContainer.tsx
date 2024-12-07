@@ -5,10 +5,16 @@ import BookingForm from '@/components/bookings/BookingForm';
 import ConfirmBooking from '@/components/bookings/ConfirmBooking';
 
 const BookingContainer = () => {
-    const { bookings, propertyId, range, price } = useProperty(
+    const { range} = useProperty(
         (state) => state
     );
-    console.log(bookings, propertyId, range, price);
+
+    if (!range || !range.from || !range.to) {
+        return null;
+    }
+    if (range.to.getTime() === range.from.getTime()) {
+     return null;   
+    }
     return (
         <div className="w-full">
             <BookingForm />
